@@ -1,15 +1,16 @@
-query_osm <- function(key, value = NULL, bb){
+query_osm <- function(key, value = NULL, bb, select = NULL){
   
-  if (is.null(value)){
-    group_shapes <- opq(bbox = st_bbox(get(bb))) %>%
-      add_osm_feature(key = key, value = NULL) %>%
-      osmdata_sf()
-  } else {
-    group_shapes <- opq(bbox = st_bbox(get(bb))) %>%
+  group_shapes <- opq(bbox = st_bbox(get(bb))) %>%
       add_osm_feature(key = key, value = value) %>%
       osmdata_sf()
-  }
   
   if (!is.null(group_shapes)) message("Query successful")
-  return(group_shapes)
+  
+  if (!is.null(select)){
+    out <- group_shapes[select]
+  } else {
+    out <- group_shapes
+  }
+  
+  return(out)
 }

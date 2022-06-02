@@ -37,6 +37,9 @@ if (process){
                         bb = "downtown")
   water <- query_osm(key = "water",
                      bb = "stb_sf")
+  away <- query_osm(key = "aerialway",
+                    bb = "stb_sf")
+
   save(osm_all_roads,
        lines,
        natural,
@@ -46,10 +49,12 @@ if (process){
        waterway,
        dt_build,
        water,
+       away,
        file = here::here("data/osm_data.rdata"))
 } else {
   load(here::here("data/osm_data.rdata"))
 }
+
 
 
 osm_paths <- osm_all_roads$osm_lines %>% 
@@ -69,6 +74,19 @@ secondary <- osm_all_roads$osm_lines %>%
   filter(highway %in% c("secondary"))
 trails <- osm_all_roads$osm_lines %>% 
   filter(highway == "path")
+dt_box <- natural2$osm_polygons %>% 
+  filter(landuse == "commercial") %>% 
+  dplyr::select(name) %>% 
+  filter(st_area(.) == max(st_area(.)))
+liftlines <- away$osm_lines %>% 
+  filter(aerialway %in% c("platter",
+                          "chair_lift")) %>% 
+  dplyr::select(name)
+pks <- 
+  natural$osm_points %>% 
+  filter(natural == "peak") %>% 
+  dplyr::select(name, ele) %>% 
+  mutate(name = paste0(name,"\n", ele, "m"))
 
 snet1 <- sfnetworks::st_network_join(sfnetworks::as_sfnetwork(np_large_roads),
                                      sfnetworks::as_sfnetwork(primary_roads)) %>% 
@@ -188,7 +206,9 @@ brd <- tibble(x1 = min(stb_dem_df2$longitude),
               y1 = min(stb_dem_df2$latitude),
               y2 = max(stb_dem_df2$latitude))
 
-stb_map <-
+
+build <- function(){
+  stb_map <-
   ggplot() +
     
   # contours
@@ -196,11 +216,12 @@ stb_map <-
                                      fill = fill_var)) +
   # ggsci::scale_fill_material("brown") +
   
-  scale_fill_gradient2(#low = "#c6b594",
-                       low = "#b3a07d",
+  scale_fill_gradient2(low = "#c6b594",
                        high = "#558050",
                        # midpoint = 2050) +
-                       midpoint = 2000) +
+                       midpoint = 1800) +
+    # coord_sf(ylim = c(40.48, 40.495),
+    #          xlim = c(-106.841, -106.8225))
   # = "#7e9e70",
   geom_sf(data = stb_sf, aes(alpha = level), size = 0.1, color = "#476930") +
   
@@ -216,8 +237,10 @@ stb_map <-
           size = 0.25) +
   
   # trails
-  geom_sf(data = trails, color = "#97825f", size = 0.2, alpha = 0.5) +
-  geom_sf(data = trails, color = "#6e5e44", size = 0.1, lty = "11") +
+  geom_sf(data = trails, color = "white", size = 0.5) +
+  # geom_sf(data = trails, color = "#97825f", size = 0.4, alpha = 0.5) +
+  geom_sf(data = trails, color = "purple", size = 0.4, alpha = 0.5) +
+  geom_sf(data = trails, color = "#6e5e44", size = 0.3, lty = "11") +
   
   # roads
   # geom_sf(data = snet2, 
@@ -239,11 +262,17 @@ stb_map <-
   geom_sf(data = pl %>% st_cast("POINT"), color = "grey", alpha = 0.9,
           size = 0.125) +
   
+  # inset
   geom_rect(data = brd,
             aes(xmin = -106.842, ymin = 40.48,
                 xmax =-106.8215, ymax = 40.495),
             fill = "transparent",
             color = "#948663") +
+  
+  # mountains
+  # geom_sf_text(data = pks, aes(label = name),
+  #              angle = -90) +
+  
   
   # figure 
   scale_x_continuous(expand = c(0.001,0.001)) +
@@ -262,10 +291,6 @@ stb_map <-
   coord_sf(xlim = c(-106.9,-106.725),
            ylim = c(40.30956, 40.5))
   
-
-
-
-
 
 # downtown inset----
 dt_build2 <- dt_build$osm_polygons %>% dplyr::select(geometry)%>% 
@@ -287,7 +312,9 @@ stb_sf2 <-
   stb_sf %>% 
   st_crop(downtown)
 
-
+howelson_lifts <- 
+  liftlines %>% 
+  st_crop(downtown)
 
 
 
@@ -304,10 +331,13 @@ dt_inset <-
   geom_sf(data = stb_sf2, aes(alpha = level), size = 0.1, color = "#476930") +
   geom_sf(data = rivers2, color = "lightblue", fill = "lightblue",
           size = 0.5) +
-  geom_sf(data = dt_build2, fill = "grey70", color = "transparent") +
-  geom_sf(data = snet4, size = 0.235, color = "black",
+  geom_sf(data = dt_box, color = "transparent", fill = "#b5ae91", alpha = 0.35) +
+  geom_sf(data = dt_build2, fill = "grey70", color = "grey60", size = 0.2) +
+  geom_sf(data = snet4, size = 0.235, color = "grey",
           fill = 'white') +
+  geom_sf(data = howelson_lifts, lty = "dashed") +
   # trails
+  geom_sf(data = trails2, color = "white", size = 0.5) +
   geom_sf(data = trails2, color = "#97825f", size = 0.4, alpha = 0.5) +
   geom_sf(data = trails2, color = "#6e5e44", size = 0.3, lty = "11") +
   scale_x_continuous(expand = c(0.001,0.001)) +
@@ -354,10 +384,13 @@ stb_map2 <-
   # theme_void()
 
 # stb_map
-y <- rpois(1, lambda = 400)
+y <- abs(round(rnorm(1),5))
 ggsave(stb_map2,
        filename = here::here("map", paste0("map_raw",y,".pdf")),
        width = 13,
        height = 20,
        units = "in",
        dpi = 200)
+}
+build()
+

@@ -13,7 +13,7 @@ stb <- sf::st_read(here::here("data/steamboat.kml")) %>%
 
 #steamboat
 crop_extent <- extent(c(xmin = -107,
-                        xmax = -106.7,
+                        xmax = -106.5,
                         ymin = 40.3,
                         ymax = 40.7))
 stb_dem <- crop(d, crop_extent)

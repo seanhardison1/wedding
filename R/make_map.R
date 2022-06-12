@@ -5,6 +5,31 @@ library(osmdata)
 library(smoothr)
 library(sfnetworks)
 
+library(elevatr)
+library(ggplot2)
+library(raster)
+library(rgdal)
+library(rnaturalearth)
+library(sp)
+library(sf)
+
+#library(devtools)
+devtools::install_github("eliocamp/ggnewscale")
+library(ggnewscale)
+
+
+# create slope and hillshade
+slope = terrain(stb_dem, opt='slope')
+aspect = terrain(stb_dem, opt='aspect')
+hill = hillShade(slope, aspect, 40, 270)
+hill_df <- hill %>% 
+  crop(extent(c(xmin = -106.93,
+                xmax = -106.79,
+                ymin = 40.3425,
+                ymax = 40.5))) %>% 
+  dream::rst_to_tib(var_name = "slope")
+
+
 source(file.path("R/query_osm.R"))
 load(here::here("data/sbt_dem.rdata"))
 ncrs <- st_crs("+proj=utm +zone=13 +datum=WGS84 +units=m +no_defs")
@@ -229,26 +254,38 @@ stb_dem_df2 <-
   projectRaster(.,crs = "+proj=longlat +datum=WGS84 +no_defs") %>% 
   dream::rst_to_tib()
 
+hill_df2 <- 
+  hill %>% 
+  # aggregate(fact = 10) %>% 
+  raster::crop(extent(downtown)) %>% 
+  projectRaster(.,crs = "+proj=longlat +datum=WGS84 +no_defs") %>% 
+  dream::rst_to_tib()
+
 brd <- tibble(x1 = min(stb_dem_df2$longitude),
               x2 = max(stb_dem_df2$longitude),
               y1 = min(stb_dem_df2$latitude),
               y2 = max(stb_dem_df2$latitude))
 
-dt_inset_color <- "#947f4b"
+dt_inset_color <- "black"
 mp <- 2000
 # build <- function(){
 stb_map <-
   ggplot() +
-  
+    geom_tile(data = hill_df, aes(x = longitude, y = latitude, 
+                                  fill = slope), show.legend = F) +
+    scale_fill_gradient(low = "black", high = "white") +
   # contours
+    new_scale_fill()+
   geom_raster(data = stb_dem_df, aes(x = longitude, y = latitude,
-                                     fill = fill_var)) +
+                                     fill = fill_var),
+              alpha = 0.7) +
   scale_fill_gradient2(low = "#cfbd9b",
                        # low = "#c6b594",
                        mid = "white",
                        # high = "#558050",
                        high = "#5a8c54",
                        midpoint = mp) +
+
   geom_sf(data = stb_sf, aes(alpha = level), size = 0.1, color = "#476930") +
 
   # water features
@@ -264,8 +301,8 @@ stb_map <-
   geom_sf(data = trails, color = "#6e5e44", size = 0.3, lty = "11") +
   
   # roads
-  geom_sf(data = snet3, size = 0.025, color = "grey80",
-          fill = 'grey20') +
+  geom_sf(data = snet3, size = 0.05, color = "grey80",
+          fill = 'grey60') +
 
   # power lines
   geom_sf(data = pl, color = "grey", alpha = 0.9, size = 0.25) +
@@ -299,9 +336,17 @@ stb_map <-
         axis.text = element_blank(),
         axis.title = element_blank()) +
   coord_sf(xlim = c(-106.93,-106.79),
+           # ylim = c(40.4, 40.5))
            ylim = c(40.3425, 40.5))
-stb_map
-
+# stb_map
+# y <- abs(round(rnorm(1),5))
+# ggsave(stb_map,
+#        filename = here::here("map", paste0("map_raw",y,".pdf")),
+#        width = 13,
+#        height = 20,
+#        units = "in",
+#        dpi = 200)
+# # }
 
 # downtown inset----
 dt_build2 <- dt_build$osm_polygons %>% dplyr::select(geometry)%>% 
@@ -336,19 +381,25 @@ howelson_baseball <-
   st_crop(downtown)
 
 dt_inset <-
-  ggplot() +
   # water features
+  ggplot() +
+  geom_tile(data = hill_df2, aes(x = longitude, y = latitude, 
+                                fill = fill_var), show.legend = F) +
+  scale_fill_gradient(low = "black", high = "white") +
+  # contours
+  new_scale_fill()+
   geom_raster(data = stb_dem_df2, aes(x = longitude, y = latitude,
-                                     fill = fill_var)) +
-  # scale_fill_gradient2(low = "#c6b594",
-  #   high = "#a6cfa1",
-  #   midpoint = 2050) +
-  scale_fill_gradient2(low = "#c4af84",
+                                     fill = fill_var),
+              alpha = 0.7) +
+  scale_fill_gradient2(low = "#cfbd9b",
                        # low = "#c6b594",
-                       # mid = "white",
+                       mid = "white",
                        # high = "#558050",
                        high = "#5a8c54",
                        midpoint = mp) +
+  
+  # geom_sf(data = stb_sf, aes(alpha = level), size = 0.1, color = "#476930") +
+  
   geom_sf(data = howelson_rodeo, fill = "brown", color = "transparent",alpha = 0.3) +
   geom_sf(data = howelson_baseball, fill = "green", color = "transparent",alpha = 0.3) +
   geom_sf(data = stb_sf2, aes(alpha = level), size = 0.1, color = "#476930") +
@@ -382,7 +433,7 @@ dt_inset <-
         axis.title = element_blank())# +
   # coord_sf(ylim = c(40.48, 40.495),
   #          xlim = c(-106.841, -106.8225))
-dt_inset
+# dt_inset
 
 
 # emerald_inset <- 
@@ -398,13 +449,13 @@ xmax <- 12
 ymin <- 1
 ymax <- 18.5
 # 
-(stb_map2 <- 
+stb_map2 <- 
     ggplot() +
     coord_equal(xlim = c(xmin, xmax), ylim = c(ymin, ymax), expand = FALSE) +
     annotation_custom(ggplotGrob(stb_map), xmin = xmin, xmax = xmax, ymin = ymin,
                       ymax = ymax) +
     cowplot::draw_plot(dt_inset, x = 1, y = 1.75, 
-                       width = 8, height = 9) )  
+                       width = 8, height = 9)   
 
   # geom_segment(aes(x = 18.6, y = 6,
   #                  xend = 15, yend = 5),
@@ -425,7 +476,7 @@ ggsave(stb_map2,
        width = 13,
        height = 20,
        units = "in",
-       dpi = 200)
+       dpi = 300)
 # }
 
 

@@ -16,8 +16,6 @@ source(file.path("R/query_osm.R"))
 load(here::here("data/sbt_dem.rdata"))
 ncrs <- st_crs("+proj=utm +zone=13 +datum=WGS84 +units=m +no_defs")
 
-# waypoints
-wps <- read.csv(here::here("data/wedding_waypoints.csv"))
 
 # create slope and hillshade
 slope = terrain(stb_dem, opt='slope')
@@ -41,6 +39,14 @@ stb_sf <- as(stb_cont, "sf") %>%
   mutate(level = as.numeric(level)) %>% 
   smooth(., method = "ksmooth", smoothness = 4) %>% 
   st_crop(full_map)
+
+# waypoints
+wps <- read.csv(here::here("data/wedding_waypoints.csv")) %>% 
+  st_as_sf(coords = c("long","lat"),
+           crs = st_crs(4326)) %>% 
+  st_crop(full_map) %>% 
+  filter(!waypoint %in% c("Carl's", 
+                          "Red Bowl"))
 
 # full dem
 stb_dem_df <- stb_dem %>% 
@@ -283,11 +289,6 @@ stb_map <-
                 xmax =-106.8215, ymax = 40.493),
             fill = "transparent",
             color = dt_inset_color) +
-  
-  # waypoints
-  geom_point(data = wps, 
-             aes(x = long, y = lat),
-             color = "purple") +
 
   # theme
   scale_x_continuous(expand = c(0.001,0.001)) +
@@ -312,8 +313,6 @@ dt_build2 <- dt_build$osm_polygons %>% dplyr::select(geometry)%>%
 sf::sf_use_s2(FALSE)
 
 wp2 <- wps %>% 
-  st_as_sf(coords = c("long","lat"),
-           crs = st_crs(dt_build2)) %>% 
   st_crop(downtown)
 
 snet4 <- 
@@ -375,7 +374,8 @@ dt_inset <-
   geom_sf(data = trails2, color = "white", size = 0.85) +
   geom_sf(data = trails2, color = trail_color, size = 0.75) +
   geom_sf(data = trails2, color = "#6e5e44", size = 0.45, lty = "11") +
-  geom_sf(data = wp2, color = "purple") +
+  geom_sf_label(data = wp2, color = "purple",
+                size = 1) +
   # themes
   scale_x_continuous(expand = c(0.001,0.001)) +
   scale_y_continuous(expand = c(0.001,0.001)) +

@@ -61,6 +61,11 @@ stb_dem_df <- stb_dem %>%
 downtown <- st_sf(geom = st_sfc(st_point(c(-106.8625,40.4575)),
                                 st_point(c(-106.8215, 40.493))),
                   crs = st_crs(stb_sf))
+
+ggplot(wps) +
+  geom_sf(data= wps) +
+  geom_sf(data = downtown)
+
   
 # query OSM----
 process <- F
@@ -308,12 +313,14 @@ stb_map <-
            ylim = c(40.3425, 40.5))
 
 # downtown inset----
-dt_build2 <- dt_build$osm_polygons %>% dplyr::select(geometry)%>% 
-  st_crop(downtown)
+
 sf::sf_use_s2(FALSE)
 
 wp2 <- wps %>% 
   st_crop(downtown)
+
+# ggplot() +
+#   geom_sf_text(data = wp2, aes(label = waypoint))
 
 snet4 <- 
   snet3 %>% 
@@ -367,15 +374,16 @@ dt_inset <-
   geom_sf(data = rivers2, color = "lightblue", fill = "lightblue",
           size = 0.5) +
   geom_sf(data = dt_box, color = "transparent", fill = "#b5ae91", alpha = 0.35) +
-  geom_sf(data = dt_build2, fill = "grey70", color = "grey30", size = 0.2) +
+  geom_sf(data = dt_build2, fill = "grey70", color = "grey65", size = 0.2) +
   geom_sf(data = snet4, size = 0.235, color = "grey60",
           fill = 'white') +
   geom_sf(data = howelson_lifts, lty = "dashed") +
   geom_sf(data = trails2, color = "white", size = 0.85) +
   geom_sf(data = trails2, color = trail_color, size = 0.75) +
   geom_sf(data = trails2, color = "#6e5e44", size = 0.45, lty = "11") +
-  geom_sf_label(data = wp2, color = "purple",
-                size = 1) +
+  geom_sf(data = wp2, color = "purple",
+               size = 1) +
+  
   # themes
   scale_x_continuous(expand = c(0.001,0.001)) +
   scale_y_continuous(expand = c(0.001,0.001)) +
@@ -394,7 +402,7 @@ dt_inset <-
         axis.ticks = element_blank(),
         axis.text = element_blank(),
         axis.title = element_blank())
-
+dt_inset
 xmin <- 1
 xmax <- 12
 ymin <- 1
@@ -416,7 +424,6 @@ ggsave(stb_map2,
        width = 11,
        height = 17,
        units = "in",
-       dpi = 300)
-
+       dpi = 500)
 
 
